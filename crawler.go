@@ -12,7 +12,7 @@ func getInfoByName(name string) string {
 	return "test"
 }
 
-func main() {
+func test() {
 	resp, err := http.Get(url)
 	excluseTexts := []string{"pv", "台版", "PV"}
 	if err != nil {
