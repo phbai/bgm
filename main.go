@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"log"
-	"os"
-	"io/ioutil"
-	"regexp"
+  "os"
+  "regexp"
+  "github.com/phbai/bgm/util"
 	// "strings"
 )
 
 type Anime struct {
 	Name string `json:"name"`
 	Thumbnail string `json:"thumbnail"`
+}
+
+type Post struct {
+  URL string `json:"url"`
+  Title string `json:"title"`
 }
 
 const URL = "http://www.halihali.cc"
@@ -60,25 +65,74 @@ func list() {
 	})
 }
 
-func get(keyword string) {
+func getLink(keyword string) string {
+	// reg := regexp.MustCompile("alt=\"" + keyword + "\"></div></a><div class=\"item-info\"><a href=\"(.*)\">" + keyword + "</a>")
 	reg := regexp.MustCompile(".*<a href=\"(.*)\">" + keyword + "</a>")
-	resp, err := http.Get(URL)
-	
-	if err != nil {
-		// handle error
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-			// handle error
-	}
-
-	html := string(body)
-	
-	params := reg.FindStringSubmatch(html)
-	
-	fmt.Println(params)
+	html, ok := util.GetHTML(URL)
+  
+  if ok {
+    params := reg.FindStringSubmatch(html)
+    url := URL + params[1]
+    return url;
+  } 
+  return ""
 }
+
+func getInfo(link string) []Post {
+  posts := []Post{}
+  body, ok := util.GetBody(link)
+  defer body.Close()
+  if !ok {
+    fmt.Print("error\n");
+  }
+  doc, err := goquery.NewDocumentFromReader(body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Find the review items
+	doc.Find(".player_list a").Each(func(i int, s *goquery.Selection) {
+    name := s.Text()
+    link, _ := s.Attr("href")
+    post := Post{Title: name, URL: URL + link}
+    posts = append(posts, post)
+    // fmt.Printf("%-20s%-20s\n", name, URL + link);
+  });
+  // fmt.Printf("%-20s%-20s\n", name, URL + link);
+  return posts;
+}
+
+func getVideoURL(link string) string {
+  html, ok := util.GetHTML(link)
+  if !ok {
+    fmt.Println("error")
+  }
+  reg := regexp.MustCompile("\"url\":\"(.*?)\"")
+
+  params := reg.FindStringSubmatch(html)
+  videoURL := params[1]
+  // url := URL + params[1]
+  // return url;
+  return videoURL
+}
+
+func getMultiVideoURL(posts []Post) {
+  chs := make(chan string, len(posts))
+  
+  for _, v := range posts {
+    go func(v Post) {
+      // fmt.Printf("正在获取%s", v.Title)
+      url := getVideoURL(v.URL)
+      // fmt.Printf("解析成功%s\n", url);
+      chs <- url
+    }(v)
+  }
+
+  for i := 0; i < len(posts); i++ {
+    url := <- chs
+    fmt.Println(url);
+  }
+}
+
 func printName(s string) {
 	length := 20;
 	trueLength := len([]rune(s))
@@ -97,7 +151,13 @@ func main() {
 	switch args[0] {
 		case "get":
 			name := args[1]
-			get(name)
+      link := getLink(name)
+      fmt.Printf("解析成功地址为:%-20s\n",link)
+      posts := getInfo(link)
+      getMultiVideoURL(posts)
+    case "parse":
+      link := args[1]
+      getVideoURL(link)
 		case "list":
 			list()
 		case "test":
