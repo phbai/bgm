@@ -74,7 +74,7 @@ func getLink(keyword string) string {
     params := reg.FindStringSubmatch(html)
     url := URL + params[1]
     return url;
-  } 
+  }
   return ""
 }
 
@@ -116,20 +116,22 @@ func getVideoURL(link string) string {
 }
 
 func getMultiVideoURL(posts []Post) {
-  chs := make(chan string, len(posts))
-  
+  dic := make(map[string](chan string))
+  // chs := make(chan string, len(posts))
+
+
   for _, v := range posts {
+    dic[v.Title] = make(chan string, 1)
+
     go func(v Post) {
-      // fmt.Printf("正在获取%s", v.Title)
       url := getVideoURL(v.URL)
-      // fmt.Printf("解析成功%s\n", url);
-      chs <- url
+      dic[v.Title] <- url
     }(v)
   }
 
-  for i := 0; i < len(posts); i++ {
-    url := <- chs
-    fmt.Println(url);
+  for _, v := range posts {
+    url := <- dic[v.Title]
+    fmt.Printf("%-20s%-20s\n", v.Title, url);
   }
 }
 
@@ -152,7 +154,7 @@ func main() {
 		case "get":
 			name := args[1]
       link := getLink(name)
-      fmt.Printf("解析成功地址为:%-20s\n",link)
+      fmt.Printf("%-15s%-20s\n", "解析成功地址为:", link)
       posts := getInfo(link)
       getMultiVideoURL(posts)
     case "parse":
